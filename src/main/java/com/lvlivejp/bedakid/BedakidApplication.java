@@ -12,10 +12,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.util.StringUtils;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -32,6 +29,14 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
     private String times;
     @Value("${avgScore}")
     private Double avgScore;
+    @Value("${weekDay}")
+    private String weekDay;
+    @Value("${sex}")
+    private String sex;
+    @Value("${ageStart}")
+    private String ageStart;
+    @Value("${ageEnd}")
+    private String ageEnd;
     public static void main(String[] args) throws IOException {
         SpringApplication.run(BedakidApplication.class, args);
     }
@@ -41,7 +46,10 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
         System.out.println("你的手机号码：" + moblie);
         System.out.println("你的密码：" + password);
         System.out.println("你选择的老师：" + teachers);
+        System.out.println("你选择的星期：" + weekDay);
         System.out.println("你选择的时间：" + times);
+        System.out.println("你选择的性别：" + getSex(sex));
+        System.out.println("你选择的年龄：" + ageStart + "~" + ageEnd);
         System.out.println("你选择的最低评价分数：" + avgScore);
         System.out.println("正确请输入y");
         Scanner scanner = new Scanner(System.in);
@@ -70,6 +78,18 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                 Integer pageNum=1;
                 String teacherId="";
                 String teacherName="";
+                Double teacherScore=0D;
+
+                Set teacherSet = new HashSet(Arrays.asList(teachers.split(",")));
+                Set weekDaySet = new HashSet();
+                if(StringUtils.hasText(weekDay)){
+                    weekDaySet = new HashSet(Arrays.asList(weekDay.split(",")));
+                }
+                Set timesSet = new HashSet();
+                if(StringUtils.hasText(times)){
+                    timesSet = new HashSet(Arrays.asList(times.split(",")));
+                }
+
                 boolean selected = false;
                 while(!selected){
                     System.out.println("查询老师列表时间：" + DateFormatUtils.format(new Date(),"yyyy/MM/dd HH:mm:ss"));
@@ -79,6 +99,18 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                         map.put("pageNum",pageNum.toString());
                         map.put("book_series_id","1");
                         map.put("week_tmp","0");
+                        if(StringUtils.hasText(weekDay)) {
+                            map.put("week_day", weekDay);
+                        }
+                        if(StringUtils.hasText(sex)) {
+                            map.put("sex", sex);
+                        }
+                        if(StringUtils.hasText(ageStart)) {
+                            map.put("age_start", ageStart);
+                        }
+                        if(StringUtils.hasText(ageEnd)) {
+                            map.put("age_end", ageEnd);
+                        }
                         if(StringUtils.hasText(times)) {
                             map.put("class_time", times);
                         }
@@ -91,7 +123,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                 System.out.println("获取老师列表出错：" + jsonObject.getString("msg"));
                                 return;
                             }
-                            Set teacherSet = new HashSet(Arrays.asList(teachers.split(",")));
+
                             JSONArray jsonArray = jsonObject.getJSONObject("data").getJSONArray("tutors");
 
                             if(jsonArray.size()==0){
@@ -110,26 +142,27 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                     if(teacherJson.getDouble("avg_score")<avgScore){
                                         continue;
                                     }else{
-                                        teacherId = teacherJson.getString("id");
-                                        teacherName = teacherJson.getString("name");
+                                        if(teacherJson.getDouble("avg_score") > teacherScore){
+                                            teacherScore = teacherJson.getDouble("avg_score");
+                                            teacherId = teacherJson.getString("id");
+                                            teacherName = teacherJson.getString("name");
+                                        }
                                     }
                                 }
 
                             }
-                            if(StringUtils.hasText(teacherId)){
-                                selected=true;
-                                break;
-                            }else{
-                                pageNum++;
-                            }
+                            pageNum++;
                         }
+                    }
+                    if(StringUtils.hasText(teacherId)){
+                        selected=true;
                     }
                     if(!selected){
                         System.out.println("无合适老师，等待下一次查询");
                         Thread.sleep(6100);
                     }
                 }
-                System.out.println("选中的老师：" + teacherName);
+                System.out.println("选中的老师：" + teacherName + "，评分：" + teacherScore);
 
                 map = new HashMap();
                 map.put("tutor_id",teacherId);
@@ -147,7 +180,25 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                     for (Object o : jsonArray) {
                         JSONObject timeJson = (JSONObject) o;
                         if(timeJson.getInteger("tick") == 1){
-                            canSelectTimes+=getWeek(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                            if(weekDaySet.size() > 0){
+                                if(weekDaySet.contains(getWeek(timeJson.getDate("cd")))){
+                                    if(timesSet.size()>0 ){
+                                        if(timesSet.contains(timeJson.getString("ct"))){
+                                            canSelectTimes+= getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                        }
+                                    }else{
+                                        canSelectTimes+= getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                    }
+                                }
+                            }else{
+                                if(timesSet.size()>0 ){
+                                    if(timesSet.contains(timeJson.getString("ct"))){
+                                        canSelectTimes+= getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                    }
+                                }else{
+                                    canSelectTimes+= getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                }
+                            }
                         }
                     }
                     System.out.println("合适的时间段：" + canSelectTimes);
@@ -160,10 +211,30 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
         }
     }
 
+    private String getSex(String sex) {
+        if("0".equals(sex)){
+            return "女";
+        }else if("1".equals(sex)){
+            return "男";
+        }
+        return "";
+    }
+
     //根据日期取得星期几
-    public static String getWeek(Date date){
+    public static String getWeekStr(Date date){
         SimpleDateFormat sdf = new SimpleDateFormat("EEEE");
         String week = sdf.format(date);
         return week;
+    }
+
+    //根据日期取得星期几
+    public static String getWeek(Date date){
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        int week_index = cal.get(Calendar.DAY_OF_WEEK) - 1;
+        if(week_index == 0){
+            week_index=7;
+        }
+        return String.valueOf(week_index);
     }
 }
