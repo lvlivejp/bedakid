@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="PROJECT_NAME" value="bedakid"/>
+    <property name="LOG_HOME" value="/home/logs"/>
+    <property name="LOG_HOME_SERVICE" value="${LOG_HOME}/${PROJECT_NAME}/service"/>
+    <property name="LOG_HOME_ERROR" value="${LOG_HOME}/${PROJECT_NAME}/error"/>
+
+    <timestamp key="bySecond" datePattern="yyyy-MM-dd"/>
+    <property name="LOG_PATTEN" value="%d{yyyy-MM-dd HH:mm:ss:SSS} ${PROJECT_NAME} [%X{X-B3-TraceId},%X{X-B3-SpanId},%X{X-B3-ParentSpanId}] [%thread] %-5level %logger{36} %L - %msg%n"/>
+
+    <!-- console log -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <Pattern>${LOG_PATTEN}</Pattern>
+        </layout>
+    </appender>
+
+    <!-- service -->
+    <appender name="serviceRolling" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>${LOG_HOME_SERVICE}/${PROJECT_NAME}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!--日志文件保留天数-->
+            <maxHistory>10</maxHistory>
+            <maxFileSize>10MB</maxFileSize>
+        </rollingPolicy>
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <Pattern>${LOG_PATTEN}</Pattern>
+        </layout>
+    </appender>
+
+    <!-- error -->
+    <appender name="errorRolling" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>${LOG_HOME_ERROR}/${PROJECT_NAME}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!--日志文件保留天数-->
+            <maxHistory>10</maxHistory>
+            <maxFileSize>10MB</maxFileSize>
+        </rollingPolicy>
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <Pattern>${LOG_PATTEN}</Pattern>
+        </layout>
+    </appender>
+
+    <logger name="com.lvlivejp.bedakid" level="info">
+        <appender-ref ref="serviceRolling"/>
+    </logger>
+
+    <root level="info">
+        <appender-ref ref="errorRolling"/>
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

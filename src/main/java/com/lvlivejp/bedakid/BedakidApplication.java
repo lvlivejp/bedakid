@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.lvlivejp.bedakid.utils.HttpClientResult;
 import com.lvlivejp.bedakid.utils.HttpClientUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
@@ -17,6 +18,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 @SpringBootApplication
+@Slf4j
 public class BedakidApplication  implements ApplicationListener<ApplicationReadyEvent> {
 
     @Value("${mobile}")
@@ -94,7 +96,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
 
                 boolean selected = false;
                 while(!selected){
-                    System.out.println("查询老师列表时间：" + DateFormatUtils.format(new Date(),"yyyy/MM/dd HH:mm:ss"));
+                    log.info("查询老师列表时间：" + DateFormatUtils.format(new Date(),"yyyy/MM/dd HH:mm:ss"));
                     pageNum=1;
                     while(true){
                         map = new HashMap();
@@ -166,7 +168,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                         Thread.sleep(6100);
                     }
                 }
-                System.out.println("选中的老师：" + teacherName + "，评分：" + teacherScore);
+                log.info("选中的老师：" + teacherName + "，评分：" + teacherScore);
 
                 map = new HashMap();
                 map.put("tutor_id",teacherId);
