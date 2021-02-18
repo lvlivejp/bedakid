@@ -139,7 +139,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                         continue;
                                     }
                                 }else{
-                                    if(teacherJson.getDouble("avg_score")<avgScore){
+                                    if(teacherJson.getDouble("avg_score")<avgScore || teacherJson.getDouble("avg_score")==5.0D){
                                         continue;
                                     }else{
                                         if(teacherJson.getDouble("avg_score") > teacherScore){
@@ -175,6 +175,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                         System.out.println("获取老师授课时间出错：" + jsonObject.getString("msg"));
                         return;
                     }
+                    List<String> canSelectList = new ArrayList<>();
                     JSONArray jsonArray = jsonObject.getJSONObject("data").getJSONArray("times");
                     String canSelectTimes="";
                     for (Object o : jsonArray) {
@@ -184,25 +185,42 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                 if(weekDaySet.contains(getWeek(timeJson.getDate("cd")))){
                                     if(timesSet.size()>0 ){
                                         if(timesSet.contains(timeJson.getString("ct"))){
-                                            canSelectTimes+= getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                            canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                            canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
                                         }
                                     }else{
-                                        canSelectTimes+= getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                        canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                        canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
                                     }
                                 }
                             }else{
                                 if(timesSet.size()>0 ){
                                     if(timesSet.contains(timeJson.getString("ct"))){
-                                        canSelectTimes+= getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                        canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                        canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
                                     }
                                 }else{
-                                    canSelectTimes+= getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                    canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                    canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
                                 }
                             }
                         }
                     }
-                    System.out.println("合适的时间段：" + canSelectTimes);
-
+                    System.out.println("合适的时间段：" + canSelectTimes + "，默认获取第一个时间段");
+                    map = new HashMap();
+                    map.put("bs_id","1");
+                    map.put("tutor_id",teacherId);
+                    map.put("dates",canSelectList.get(0));
+                    httpClientResult = HttpClientUtils.doPost("https://service.bedakid.com/api/student/datebook/week/submitTimes", headMap, map, null);
+                    if(httpClientResult.getCode()==200) {
+                        jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+                        code = jsonObject.getString("code");
+                        if (!"0".equals(code)) {
+                            System.out.println("预约课程出错：" + jsonObject.getString("msg"));
+                        }else{
+                            System.out.println("预约课程成功，恭喜你！！！下节课时间为：" + canSelectList.get(0));
+                        }
+                    }
                 }
             } catch (Exception e) {
                 e.printStackTrace();
