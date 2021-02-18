@@ -93,6 +93,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                 boolean selected = false;
                 while(!selected){
                     System.out.println("查询老师列表时间：" + DateFormatUtils.format(new Date(),"yyyy/MM/dd HH:mm:ss"));
+                    pageNum=1;
                     while(true){
                         map = new HashMap();
                         map.put("spare","1");
@@ -140,6 +141,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                     }
                                 }else{
                                     if(teacherJson.getDouble("avg_score")<avgScore || teacherJson.getDouble("avg_score")==5.0D){
+                                        System.out.println("老师：" + teacherJson.getString("name") + "，评分：" + teacherJson.getDouble("avg_score"));
                                         continue;
                                     }else{
                                         if(teacherJson.getDouble("avg_score") > teacherScore){
