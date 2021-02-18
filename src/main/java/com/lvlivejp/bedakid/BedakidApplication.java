@@ -132,6 +132,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                             }
                             for (Object o : jsonArray) {
                                 JSONObject teacherJson = (JSONObject) o;
+                                System.out.println("老师：" + teacherJson.getString("name") + "，评分：" + teacherJson.getDouble("avg_score"));
                                 if(StringUtils.hasText(teachers)){
                                     if(teacherSet.contains(teacherJson.get("name"))){
                                         teacherId = teacherJson.getString("id");
@@ -141,7 +142,6 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                     }
                                 }else{
                                     if(teacherJson.getDouble("avg_score")<avgScore || teacherJson.getDouble("avg_score")==5.0D){
-                                        System.out.println("老师：" + teacherJson.getString("name") + "，评分：" + teacherJson.getDouble("avg_score"));
                                         continue;
                                     }else{
                                         if(teacherJson.getDouble("avg_score") > teacherScore){
