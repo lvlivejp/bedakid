@@ -37,6 +37,8 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
     private String ageStart;
     @Value("${ageEnd}")
     private String ageEnd;
+    @Value("${isOrder}")
+    private boolean isOrder;
     public static void main(String[] args) throws IOException {
         SpringApplication.run(BedakidApplication.class, args);
     }
@@ -209,18 +211,20 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                         }
                     }
                     System.out.println("合适的时间段：" + canSelectTimes + "，默认获取第一个时间段");
-                    map = new HashMap();
-                    map.put("bs_id","1");
-                    map.put("tutor_id",teacherId);
-                    map.put("dates",canSelectList.get(0));
-                    httpClientResult = HttpClientUtils.doPost("https://service.bedakid.com/api/student/datebook/week/submitTimes", headMap, map, null);
-                    if(httpClientResult.getCode()==200) {
-                        jsonObject = JSONObject.parseObject(httpClientResult.getContent());
-                        code = jsonObject.getString("code");
-                        if (!"0".equals(code)) {
-                            System.out.println("预约课程出错：" + jsonObject.getString("msg"));
-                        }else{
-                            System.out.println("预约课程成功，恭喜你！！！下节课时间为：" + canSelectList.get(0));
+                    if(isOrder){
+                        map = new HashMap();
+                        map.put("bs_id","1");
+                        map.put("tutor_id",teacherId);
+                        map.put("dates",canSelectList.get(0));
+                        httpClientResult = HttpClientUtils.doPost("https://service.bedakid.com/api/student/datebook/week/submitTimes", headMap, map, null);
+                        if(httpClientResult.getCode()==200) {
+                            jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+                            code = jsonObject.getString("code");
+                            if (!"0".equals(code)) {
+                                System.out.println("预约课程出错：" + jsonObject.getString("msg"));
+                            }else{
+                                System.out.println("预约课程成功，恭喜你！！！下节课时间为：" + canSelectList.get(0));
+                            }
                         }
                     }
                 }
