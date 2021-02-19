@@ -41,6 +41,8 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
     private String ageEnd;
     @Value("${isOrder}")
     private boolean isOrder;
+    @Value("${followCount}")
+    private Integer followCount;
     public static void main(String[] args) throws IOException {
         SpringApplication.run(BedakidApplication.class, args);
     }
@@ -55,6 +57,8 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
         System.out.println("你选择的性别：" + getSex(sex));
         System.out.println("你选择的年龄：" + ageStart + "~" + ageEnd);
         System.out.println("你选择的最低评价分数：" + avgScore);
+        System.out.println("你选择的最低关注数：" + followCount);
+        System.out.println("是否预约：" + isOrder);
         System.out.println("正确请输入y");
         Scanner scanner = new Scanner(System.in);
         scanner.hasNext();
@@ -67,15 +71,18 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
             try {
                 String token = null;
                 HttpClientResult httpClientResult = HttpClientUtils.doPost("https://service.bedakid.com/visitor/wxminiapp_bind", map, null);
-                if(httpClientResult.getCode()==200){
-                    JSONObject jsonObject = JSONObject.parseObject(httpClientResult.getContent());
-                    String code = jsonObject.getString("code");
-                    if(!"0".equals(code)){
-                        System.out.println("登录出错：" + jsonObject.getString("msg"));
-                        return;
-                    }
-                    token = jsonObject.getJSONObject("data").getString("token");
+                if(httpClientResult.getCode()!=200) {
+                    return;
                 }
+
+                JSONObject jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+                String code = jsonObject.getString("code");
+                if(!"0".equals(code)){
+                    System.out.println("登录出错：" + jsonObject.getString("msg"));
+                    return;
+                }
+
+                token = jsonObject.getJSONObject("data").getString("token");
                 Map<String, String> headMap = new HashMap<>();
                 headMap.put("Authorization",token);
 
@@ -100,6 +107,9 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                     while(!selected){
                         log.info("查询老师列表时间：" + DateFormatUtils.format(new Date(),"yyyy/MM/dd HH:mm:ss"));
                         pageNum=1;
+                        teacherId="";
+                        teacherName="";
+                        teacherScore=0D;
                         while(true){
                             map = new HashMap();
                             map.put("spare","1");
@@ -123,85 +133,99 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                             }
 
                             httpClientResult = HttpClientUtils.doGet("https://service.bedakid.com/api/student/datebook/searchtutor/week", headMap, map, null);
-                            if(httpClientResult.getCode()==200) {
-                                JSONObject jsonObject = JSONObject.parseObject(httpClientResult.getContent());
-                                String code = jsonObject.getString("code");
-                                if(!"0".equals(code)){
-                                    System.out.println("获取老师列表出错：" + jsonObject.getString("msg"));
-                                    return;
-                                }
+                            if(httpClientResult.getCode()!=200) {
+                                return;
+                            }
+                            jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+                            code = jsonObject.getString("code");
+                            if(!"0".equals(code)){
+                                log.info("获取老师列表出错：" + jsonObject.getString("msg"));
+                                return;
+                            }
 
-                                JSONArray jsonArray = jsonObject.getJSONObject("data").getJSONArray("tutors");
+                            JSONArray jsonArray = jsonObject.getJSONObject("data").getJSONArray("tutors");
 
-                                if(jsonArray.size()==0){
-                                    break;
-                                }
-                                for (Object o : jsonArray) {
-                                    JSONObject teacherJson = (JSONObject) o;
-                                    System.out.println("老师：" + teacherJson.getString("name") + "，评分：" + teacherJson.getDouble("avg_score"));
-                                    if(StringUtils.hasText(teachers)){
-                                        if(teacherSet.contains(teacherJson.get("name"))){
-                                            teacherId = teacherJson.getString("id");
-                                            teacherName = teacherJson.getString("name");
-                                        }else{
-                                            continue;
-                                        }
+                            if(jsonArray.size()==0){
+                                break;
+                            }
+                            for (Object o : jsonArray) {
+                                JSONObject teacherJson = (JSONObject) o;
+                                log.info("老师：" + teacherJson.getString("name") + "，评分：" + teacherJson.getDouble("avg_score"));
+                                if(StringUtils.hasText(teachers)){
+                                    if(teacherSet.contains(teacherJson.get("name"))){
+                                        teacherId = teacherJson.getString("id");
+                                        teacherName = teacherJson.getString("name");
                                     }else{
-                                        if(teacherJson.getDouble("avg_score")<avgScore || teacherJson.getDouble("avg_score")==5.0D){
-                                            continue;
-                                        }else{
-                                            if(teacherJson.getDouble("avg_score") > teacherScore){
+                                        continue;
+                                    }
+                                }else{
+                                    if(teacherJson.getDouble("avg_score")<avgScore || teacherJson.getDouble("avg_score")==5.0D){
+                                        continue;
+                                    }else{
+                                        if(teacherJson.getDouble("avg_score") > teacherScore){
+                                            //获取关注数
+                                            map = new HashMap();
+                                            map.put("id",teacherJson.getString("id"));
+                                            httpClientResult = HttpClientUtils.doGet("https://service.bedakid.com/api/student/tutor/detail", headMap, map, null);
+                                            if(httpClientResult.getCode()!=200) {
+                                                return;
+                                            }
+                                            jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+                                            code = jsonObject.getString("code");
+                                            if(!"0".equals(code)){
+                                                log.info("获取老师关注数出错：" + jsonObject.getString("msg"));
+                                                return;
+                                            }
+                                            jsonArray = jsonObject.getJSONObject("data").getJSONArray("tutors");
+                                            if(jsonArray.size()==0){
+                                                break;
+                                            }
+                                            Integer teacherfollowCount=((JSONObject)jsonArray.get(0)).getInteger("follower_count");
+                                            log.info("#####################################老师：" + teacherJson.getString("name") + "，关注数：" + teacherfollowCount);
+                                            if(teacherfollowCount>=followCount){
                                                 teacherScore = teacherJson.getDouble("avg_score");
                                                 teacherId = teacherJson.getString("id");
                                                 teacherName = teacherJson.getString("name");
                                             }
                                         }
                                     }
-
                                 }
-                                pageNum++;
+
                             }
+                            pageNum++;
                         }
                         if(StringUtils.hasText(teacherId)){
                             selected=true;
                         }
                         if(!selected){
-                            System.out.println("无合适老师，等待下一次查询");
+                            log.info("无合适老师，等待下一次查询");
                             Thread.sleep(6100);
                         }
                     }
-                    log.info("选中的老师：" + teacherName + "，评分：" + teacherScore);
+                    log.info("######################################################选中的老师：" + teacherName + "，评分：" + teacherScore);
 
                     map = new HashMap();
                     map.put("tutor_id",teacherId);
                     map.put("week_tmp","0");
                     httpClientResult = HttpClientUtils.doGet("https://service.bedakid.com/api/student/datebook/week/tutortimes", headMap, map, null);
-                    if(httpClientResult.getCode()==200) {
-                        JSONObject jsonObject = JSONObject.parseObject(httpClientResult.getContent());
-                        String code = jsonObject.getString("code");
-                        if (!"0".equals(code)) {
-                            System.out.println("获取老师授课时间出错：" + jsonObject.getString("msg"));
-                            return;
-                        }
-                        List<String> canSelectList = new ArrayList<>();
-                        JSONArray jsonArray = jsonObject.getJSONObject("data").getJSONArray("times");
-                        String canSelectTimes="";
-                        for (Object o : jsonArray) {
-                            JSONObject timeJson = (JSONObject) o;
-                            if(timeJson.getInteger("tick") == 1){
-                                if(weekDaySet.size() > 0){
-                                    if(weekDaySet.contains(getWeek(timeJson.getDate("cd")))){
-                                        if(timesSet.size()>0 ){
-                                            if(timesSet.contains(timeJson.getString("ct"))){
-                                                canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
-                                                canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
-                                            }
-                                        }else{
-                                            canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
-                                            canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
-                                        }
-                                    }
-                                }else{
+                    if(httpClientResult.getCode()!=200) {
+                        return;
+                    }
+                    jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+                    code = jsonObject.getString("code");
+                    if (!"0".equals(code)) {
+                        log.info("获取老师授课时间出错：" + jsonObject.getString("msg"));
+                        return;
+                    }
+                    List<String> canSelectList = new ArrayList<>();
+                    JSONArray jsonArray = jsonObject.getJSONObject("data").getJSONArray("times");
+                    String canSelectTimes="";
+                    for (Object o : jsonArray) {
+                        JSONObject timeJson = (JSONObject) o;
+                        if(timeJson.getInteger("tick") == 1){
+                            log.info("合适的时间段：" + timeJson.getString("cd") + timeJson.getString("ct"));
+                            if(weekDaySet.size() > 0){
+                                if(weekDaySet.contains(getWeek(timeJson.getDate("cd")))){
                                     if(timesSet.size()>0 ){
                                         if(timesSet.contains(timeJson.getString("ct"))){
                                             canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
@@ -212,24 +236,36 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                         canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
                                     }
                                 }
-                            }
-                        }
-                        System.out.println("合适的时间段：" + canSelectTimes + "，默认获取第一个时间段");
-                        if(isOrder){
-                            map = new HashMap();
-                            map.put("bs_id","1");
-                            map.put("tutor_id",teacherId);
-                            map.put("dates",canSelectList.get(0));
-                            httpClientResult = HttpClientUtils.doPost("https://service.bedakid.com/api/student/datebook/week/submitTimes", headMap, map, null);
-                            if(httpClientResult.getCode()==200) {
-                                jsonObject = JSONObject.parseObject(httpClientResult.getContent());
-                                code = jsonObject.getString("code");
-                                if (!"0".equals(code)) {
-                                    System.out.println("预约课程出错：" + jsonObject.getString("msg"));
+                            }else{
+                                if(timesSet.size()>0 ){
+                                    if(timesSet.contains(timeJson.getString("ct"))){
+                                        canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                        canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
+                                    }
                                 }else{
-                                    System.out.println("预约课程成功，恭喜你！！！下节课时间为：" + canSelectList.get(0));
+                                    canSelectTimes+= timeJson.getString("cd")+getWeekStr(timeJson.getDate("cd")) + " " +timeJson.getString("ct") + ";";
+                                    canSelectList.add(timeJson.getString("cd") + " " +timeJson.getString("ct"));
                                 }
                             }
+                        }
+                    }
+                    log.info("合适的时间段：" + canSelectTimes + "，默认获取第一个时间段");
+                    if(isOrder){
+                        map = new HashMap();
+                        map.put("bs_id","1");
+                        map.put("tutor_id",teacherId);
+                        map.put("dates",canSelectList.get(0));
+                        httpClientResult = HttpClientUtils.doPost("https://service.bedakid.com/api/student/datebook/week/submitTimes", headMap, map, null);
+                        System.out.println("预约课程报文：" + JSONObject.toJSONString(httpClientResult));
+                        if(httpClientResult.getCode()!=200) {
+                            return;
+                        }
+                        jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+                        code = jsonObject.getString("code");
+                        if (!"0".equals(code)) {
+                            log.info("预约课程出错：" + jsonObject.getString("msg"));
+                        }else{
+                            log.info("预约课程成功，恭喜你！！！下节课时间为：" + canSelectList.get(0));
                         }
                     }
                     Thread.sleep(6100);

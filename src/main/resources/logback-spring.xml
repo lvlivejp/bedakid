@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <property name="PROJECT_NAME" value="bedakid"/>
-    <property name="LOG_HOME" value="/home/logs"/>
+    <property name="LOG_HOME" value="./"/>
     <property name="LOG_HOME_SERVICE" value="${LOG_HOME}/${PROJECT_NAME}/service"/>
     <property name="LOG_HOME_ERROR" value="${LOG_HOME}/${PROJECT_NAME}/error"/>
 
