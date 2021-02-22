@@ -255,7 +255,13 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                             }
                         }
                     }
-                    log.info("合适的时间段：" + canSelectTimes + "，默认获取第一个时间段");
+                    if(canSelectList.size()==0){
+                        log.info("时间段已约满，等待下一次查询");
+                        continue;
+                    }else{
+                        log.info("合适的时间段：" + canSelectTimes + "，默认获取第一个时间段");
+
+                    }
                     if(isOrder){
                         map = new HashMap();
                         map.put("bs_id","1");
