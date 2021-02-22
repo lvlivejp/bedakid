@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.time.LocalTime;
 import java.util.*;
 
 @SpringBootApplication
@@ -105,6 +106,11 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                 while(keepSelect){
                     boolean selected = false;
                     while(!selected){
+                        if(LocalTime.now().isBefore(LocalTime.of(1,0,0)) && LocalTime.now().isAfter(LocalTime.of(0,0,0))){
+                            log.info("系统维护时间，10分钟后再次查询。");
+                            Thread.sleep(60000);
+                            continue;
+                        }
                         log.info("查询老师列表时间：" + DateFormatUtils.format(new Date(),"yyyy/MM/dd HH:mm:ss"));
                         pageNum=1;
                         teacherId="";
@@ -199,7 +205,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                         }
                         if(!selected){
                             log.info("无合适老师，等待下一次查询");
-                            Thread.sleep(6100);
+                            Thread.sleep(10100);
                         }
                     }
                     log.info("######################################################选中的老师：" + teacherName + "，评分：" + teacherScore);
