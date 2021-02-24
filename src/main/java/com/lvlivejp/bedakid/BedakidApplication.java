@@ -74,7 +74,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
         if("y".equals(next)){
             HttpClientResult httpClientResult = null;
             try {
-                httpClientResult = HttpClientUtils.doGet("http://www.lvincn.cn1/beda/check?mobile="+moblie, null, null);
+                httpClientResult = HttpClientUtils.doGet("http://www.lvincn.cn/beda/check?mobile="+moblie, null, null);
                 if(httpClientResult.getCode() == 400){
                     log.info("非认证手机号，请联系管理员添加白名单。");
                 }
