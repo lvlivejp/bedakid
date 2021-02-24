@@ -2,15 +2,18 @@ package com.lvlivejp.bedakid;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.lvlivejp.bedakid.service.WexinService;
 import com.lvlivejp.bedakid.utils.HttpClientResult;
 import com.lvlivejp.bedakid.utils.HttpClientUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
@@ -20,6 +23,7 @@ import java.util.*;
 
 @SpringBootApplication
 @Slf4j
+@EnableAsync
 public class BedakidApplication  implements ApplicationListener<ApplicationReadyEvent> {
 
     @Value("${mobile}")
@@ -44,6 +48,9 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
     private boolean isOrder;
     @Value("${followCount}")
     private Integer followCount;
+    @Autowired
+    private WexinService wexinService;
+
     public static void main(String[] args) throws IOException {
         SpringApplication.run(BedakidApplication.class, args);
     }
@@ -65,13 +72,22 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
         scanner.hasNext();
         String next = scanner.next();
         if("y".equals(next)){
+            HttpClientResult httpClientResult = null;
+            try {
+                httpClientResult = HttpClientUtils.doGet("http://www.lvincn.cn1/beda/check?mobile="+moblie, null, null);
+                if(httpClientResult.getCode() == 400){
+                    log.info("非认证手机号，请联系管理员添加白名单。");
+                }
+            } catch (Exception e) {
+            }
+
             Map map = new HashMap();
             map.put("code","071Pnx0w322UOV2BHo0w3B51Si4Pnx0k");
             map.put("input",moblie);
             map.put("password",password);
             try {
                 String token = null;
-                HttpClientResult httpClientResult = HttpClientUtils.doPost("https://service.bedakid.com/visitor/wxminiapp_bind", map, null);
+                httpClientResult = HttpClientUtils.doPost("https://service.bedakid.com/visitor/wxminiapp_bind", map, null);
                 if(httpClientResult.getCode()!=200) {
                     return;
                 }
@@ -165,7 +181,8 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                         continue;
                                     }
                                 }else{
-                                    if(teacherJson.getDouble("avg_score")<avgScore || teacherJson.getDouble("avg_score")==5.0D){
+                                    // || teacherJson.getDouble("avg_score")==5.0D
+                                    if(teacherJson.getDouble("avg_score")<avgScore){
                                         continue;
                                     }else{
                                         if(teacherJson.getDouble("avg_score") > teacherScore){
@@ -278,6 +295,7 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                             log.info("预约课程出错：" + jsonObject.getString("msg"));
                         }else{
                             log.info("预约课程成功，恭喜你！！！下节课时间为：" + canSelectList.get(0));
+                            wexinService.sendMsg("预约课程成功，恭喜你！！！选中的老师：" + teacherName + "，评分：" + teacherScore);
                         }
                     }
                     Thread.sleep(6100);
