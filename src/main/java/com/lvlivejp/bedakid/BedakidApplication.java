@@ -2,6 +2,8 @@ package com.lvlivejp.bedakid;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.lvlivejp.bedakid.domain.TeacherInfo;
+import com.lvlivejp.bedakid.service.TeacherService;
 import com.lvlivejp.bedakid.service.WexinService;
 import com.lvlivejp.bedakid.utils.HttpClientResult;
 import com.lvlivejp.bedakid.utils.HttpClientUtils;
@@ -9,6 +11,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
@@ -28,6 +31,7 @@ import java.util.*;
 @SpringBootApplication
 @Slf4j
 @EnableAsync
+@MapperScan("com.lvlivejp.bedakid.mapper")
 public class BedakidApplication  implements ApplicationListener<ApplicationReadyEvent> {
 
     @Value("${mobile}")
@@ -54,6 +58,8 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
     private Integer followCount;
     @Autowired
     private WexinService wexinService;
+    @Autowired
+    private TeacherService teacherService;
 
     public static void main(String[] args) throws IOException {
         SpringApplication.run(BedakidApplication.class, args);
@@ -212,33 +218,54 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                                 BigDecimal total = BigDecimal.ZERO;
                                                 BigDecimal star = BigDecimal.ZERO;
                                                 int i=1;
-                                                while (true){
-                                                    // 获取评论，计算分数
-                                                    map = new HashMap();
-                                                    map.put("pageNum",i++ +"");
-                                                    map.put("tutor_id",teacherJson.getString("id"));
-                                                    httpClientResult = HttpClientUtils.doGet("https://service.bedakid.com/api/student/tutor/comments/query", headMap, map, null);
-                                                    if(httpClientResult.getCode()!=200) {
-                                                        return;
-                                                    }
-                                                    jsonObject = JSONObject.parseObject(httpClientResult.getContent());
-                                                    code = jsonObject.getString("code");
-                                                    if(!"0".equals(code)){
-                                                        log.info("获取老师评论出错：" + jsonObject.getString("msg"));
-                                                        return;
-                                                    }
-                                                    jsonArray = jsonObject.getJSONObject("data").getJSONArray("result");
-                                                    if(jsonArray.size()==0){
-                                                        break;
-                                                    }
-                                                    for (Object o1 : jsonArray) {
-                                                        JSONObject plJs =  (JSONObject) o1;
-                                                        star = star.add(plJs.getBigDecimal("tutor_star"));
-                                                        total = total.add(BigDecimal.ONE);
-                                                    }
-
+                                                TeacherInfo teacherInfo = teacherService.getTeacherInfo(teacherJson.getString("id"));
+                                                if(teacherInfo == null){
+                                                    teacherInfo = new TeacherInfo();
+                                                    teacherInfo.setName(teacherJson.getString("name"));
+                                                    teacherInfo.setId(teacherJson.getString("id"));
+                                                    teacherService.insertTeacherInfo(teacherInfo);
                                                 }
-                                                teacherScore = star.divide(total,2, RoundingMode.HALF_UP).doubleValue();
+                                                if(teacherInfo.getUpdateTime() == null || (new Date().getTime() - teacherInfo.getUpdateTime().getTime())>1000*60*60*24){
+                                                    while (true){
+                                                        // 获取评论，计算分数
+                                                        map = new HashMap();
+                                                        map.put("pageNum",i++ +"");
+                                                        map.put("tutor_id",teacherJson.getString("id"));
+                                                        httpClientResult = HttpClientUtils.doGet("https://service.bedakid.com/api/student/tutor/comments/query", headMap, map, null);
+                                                        if(httpClientResult.getCode()!=200) {
+                                                            return;
+                                                        }
+                                                        jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+                                                        code = jsonObject.getString("code");
+                                                        if(!"0".equals(code)){
+                                                            log.info("获取老师评论出错：" + jsonObject.getString("msg"));
+                                                            return;
+                                                        }
+                                                        jsonArray = jsonObject.getJSONObject("data").getJSONArray("result");
+                                                        if(jsonArray.size()==0){
+                                                            break;
+                                                        }
+                                                        for (Object o1 : jsonArray) {
+                                                            JSONObject plJs =  (JSONObject) o1;
+                                                            star = star.add(plJs.getBigDecimal("tutor_star"));
+                                                            total = total.add(BigDecimal.ONE);
+                                                        }
+
+                                                    }
+                                                    teacherInfo.setStartCount(star.intValue());
+                                                    teacherInfo.setTotalComment(total.intValue());
+                                                    teacherInfo.setUpdateTime(new Date());
+                                                    teacherService.updateTeacherInfo(teacherInfo);
+                                                }else{
+                                                    star = new BigDecimal(teacherInfo.getStartCount());
+                                                    total = new BigDecimal(teacherInfo.getTotalComment());
+                                                }
+                                                if(total.intValue()==0){
+                                                    teacherScore = 0;
+                                                }else{
+                                                    teacherScore = star.divide(total,2, RoundingMode.HALF_UP).doubleValue();
+                                                }
+                                                log.info("老师：" + teacherJson.getString("name") + "，分数：" + teacherScore);
                                                 if(teacherScore > teacherScoreBase){
                                                     teacherScoreBase = teacherScore;
                                                     teacherId = teacherJson.getString("id");
