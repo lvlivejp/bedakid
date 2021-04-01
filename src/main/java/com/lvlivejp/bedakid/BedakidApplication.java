@@ -113,6 +113,10 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                 Map<String, String> headMap = new HashMap<>();
                 headMap.put("Authorization",token);
 
+
+//                updateAllTeacherScore(headMap);
+
+
                 Integer pageNum=1;
                 String teacherId="";
                 String teacherName="";
@@ -212,62 +216,23 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
                                                 }
                                             }
                                         }else{
-                                            Integer teacherfollowCount= getTeacherfollowCount(teacherJson.getString("id"),headMap);
-                                            log.info("老师：" + teacherJson.getString("name") + "，关注数：" + teacherfollowCount);
-                                            if(teacherfollowCount >= followCount){
-                                                BigDecimal total = BigDecimal.ZERO;
-                                                BigDecimal star = BigDecimal.ZERO;
-                                                int i=1;
-                                                TeacherInfo teacherInfo = teacherService.getTeacherInfo(teacherJson.getString("id"));
-                                                if(teacherInfo == null){
-                                                    teacherInfo = new TeacherInfo();
-                                                    teacherInfo.setName(teacherJson.getString("name"));
-                                                    teacherInfo.setId(teacherJson.getString("id"));
-                                                    teacherService.insertTeacherInfo(teacherInfo);
-                                                }
-                                                if(teacherInfo.getUpdateTime() == null || (new Date().getTime() - teacherInfo.getUpdateTime().getTime())>1000*60*60*24){
-                                                    while (true){
-                                                        // 获取评论，计算分数
-                                                        map = new HashMap();
-                                                        map.put("pageNum",i++ +"");
-                                                        map.put("tutor_id",teacherJson.getString("id"));
-                                                        httpClientResult = HttpClientUtils.doGet("https://service.bedakid.com/api/student/tutor/comments/query", headMap, map, null);
-                                                        if(httpClientResult.getCode()!=200) {
-                                                            return;
-                                                        }
-                                                        jsonObject = JSONObject.parseObject(httpClientResult.getContent());
-                                                        code = jsonObject.getString("code");
-                                                        if(!"0".equals(code)){
-                                                            log.info("获取老师评论出错：" + jsonObject.getString("msg"));
-                                                            return;
-                                                        }
-                                                        jsonArray = jsonObject.getJSONObject("data").getJSONArray("result");
-                                                        if(jsonArray.size()==0){
-                                                            break;
-                                                        }
-                                                        for (Object o1 : jsonArray) {
-                                                            JSONObject plJs =  (JSONObject) o1;
-                                                            star = star.add(plJs.getBigDecimal("tutor_star"));
-                                                            total = total.add(BigDecimal.ONE);
-                                                        }
-
-                                                    }
-                                                    teacherInfo.setStartCount(star.intValue());
-                                                    teacherInfo.setTotalComment(total.intValue());
-                                                    teacherInfo.setUpdateTime(new Date());
-                                                    teacherService.updateTeacherInfo(teacherInfo);
-                                                }else{
-                                                    star = new BigDecimal(teacherInfo.getStartCount());
-                                                    total = new BigDecimal(teacherInfo.getTotalComment());
-                                                }
-                                                if(total.intValue()==0){
-                                                    teacherScore = 0;
-                                                }else{
-                                                    teacherScore = star.divide(total,2, RoundingMode.HALF_UP).doubleValue();
-                                                }
-                                                log.info("老师：" + teacherJson.getString("name") + "，分数：" + teacherScore);
-                                                if(teacherScore > teacherScoreBase){
-                                                    teacherScoreBase = teacherScore;
+                                            TeacherInfo teacherInfo = teacherService.getTeacherInfo(teacherJson.getString("id"));
+                                            if(teacherInfo == null){
+                                                teacherInfo = new TeacherInfo();
+                                                teacherInfo.setName(teacherJson.getString("name"));
+                                                teacherInfo.setId(teacherJson.getString("id"));
+                                                teacherService.insertTeacherInfo(teacherInfo);
+                                            }
+//                                                if(teacherInfo.getUpdateTime() == null || (new Date().getTime() - teacherInfo.getUpdateTime().getTime())>1000*60*60*24){
+//                                                    updateTeacherScore(teacherJson.getString("id"),teacherInfo,headMap);
+//                                                }
+                                            log.info("*************************老师：" + teacherJson.getString("name") + "，分数：" + teacherInfo.getScore());
+                                            if(teacherInfo.getScore()!=null && teacherInfo.getScore() >= teacherScoreBase){
+                                                Integer teacherfollowCount= getTeacherfollowCount(teacherJson.getString("id"),headMap);
+                                                log.info("老师：" + teacherJson.getString("name") + "，关注数：" + teacherfollowCount);
+                                                if(teacherfollowCount >= followCount){
+                                                    teacherScoreBase = teacherInfo.getScore();
+                                                    teacherScore = teacherInfo.getScore();
                                                     teacherId = teacherJson.getString("id");
                                                     teacherName = teacherJson.getString("name");
                                                 }
@@ -373,6 +338,55 @@ public class BedakidApplication  implements ApplicationListener<ApplicationReady
 
         }
     }
+
+
+    /*@SneakyThrows
+    private void updateTeacherScore(String teacherId, TeacherInfo teacherInfo, Map headMap) {
+        int i=1;
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal star = BigDecimal.ZERO;
+        while (true){
+            // 获取评论，计算分数
+            Map map = new HashMap();
+            map.put("pageNum",i++ +"");
+            map.put("tutor_id",teacherId);
+            HttpClientResult httpClientResult = HttpClientUtils.doGet("https://service.bedakid.com/api/student/tutor/comments/query", headMap, map, null);
+            if(httpClientResult.getCode()!=200) {
+                return;
+            }
+            JSONObject jsonObject = JSONObject.parseObject(httpClientResult.getContent());
+            String code = jsonObject.getString("code");
+            if(!"0".equals(code)){
+                log.info("获取老师评论出错：" + jsonObject.getString("msg"));
+                return;
+            }
+            JSONArray jsonArray = jsonObject.getJSONObject("data").getJSONArray("result");
+            if(jsonArray.size()==0){
+                break;
+            }
+            for (Object o1 : jsonArray) {
+                JSONObject plJs =  (JSONObject) o1;
+                star = star.add(plJs.getBigDecimal("tutor_star"));
+                total = total.add(BigDecimal.ONE);
+            }
+
+        }
+
+        if(total.intValue()==0){
+            teacherInfo.setScore(0);
+        }else{
+            teacherInfo.setScore(star.divide(total,2, RoundingMode.HALF_UP).doubleValue());
+        }
+        teacherInfo.setStartCount(star.intValue());
+        teacherInfo.setTotalComment(total.intValue());
+        teacherInfo.setUpdateTime(new Date());
+
+        try {
+            teacherService.updateTeacherInfo(teacherInfo);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }*/
 
     @SneakyThrows
     private Integer getTeacherfollowCount(String teacherId, Map<String, String> headMap) {
